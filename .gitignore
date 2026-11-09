@@ -1,0 +1,19 @@
+.env
+.venv/
+__pycache__/
+data/
+.pytest_cache/
+gd_api.txt
+# Local credentials, scratch notes, databases and archives
+.env.*
+!.env.example
+temp.txt
+credentials*.json
+token*.json
+*.key
+*.pem
+*.sqlite3
+*.sqlite3-*
+*.db
+*.cso-backup
+.DS_Store
