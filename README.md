@@ -203,6 +203,21 @@ Extreme LZMA can require hundreds of MiB for its encoder alone, in addition to f
 
 New encrypted uploads store the same authenticated Fernet ciphertext in a compact binary envelope instead of Base64 text. This removes most of the avoidable Base64 expansion; it does not weaken encryption. Existing Base64 Fernet objects remain readable without rewriting them. Existing cloud objects are not recompressed or converted automatically.
 
+## Docker quick start
+
+Install Docker Engine with Compose, then:
+
+```sh
+git clone https://github.com/CosineCloud/CSO.git
+cd CSO
+cp docker.env.example .env
+# Edit .env with your OuthMan origin, app ID and secret.
+docker compose pull
+docker compose up -d --no-build
+```
+
+Open `http://YOUR_SERVER:10081`. The image supports Linux ARM64 and AMD64. Configuration and keys persist in the named data volume. If the published package is unavailable, run `docker compose build --pull` before starting instead. See [deployment_instructions.md](deployment_instructions.md) for first enrollment, private package access, updates and migration.
+
 ## Raspberry Pi deployment
 
 See [deployment_instructions.md](deployment_instructions.md) for 64-bit ARM installation, systemd, HTTPS, memory limits and migration.

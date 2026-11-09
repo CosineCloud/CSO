@@ -1,3 +1,80 @@
+# Deploy CSO with Docker (recommended)
+
+The image includes Python, CSO, its dependencies and rclone for MEGA. You do not need to install Python packages, create a service account or configure systemd yourself. A named Docker volume preserves configuration, encryption keys and local data between container replacements.
+
+## Quick start on a 64-bit Raspberry Pi
+
+Install Docker Engine and the Compose plugin once using the [official Debian instructions](https://docs.docker.com/engine/install/debian/), which apply to 64-bit Raspberry Pi OS. Confirm `docker compose version` works. Use `sudo` with Docker commands if your account does not have Docker access.
+
+```sh
+git clone https://github.com/CosineCloud/CSO.git
+cd CSO
+cp docker.env.example .env
+chmod 600 .env
+nano .env
+```
+
+Replace the three OuthMan values in `.env`, then:
+
+```sh
+docker compose pull
+docker compose up -d --no-build
+docker compose ps
+docker compose logs --tail=50
+```
+
+Open **http://YOUR_PI_ADDRESS:10081**. For initial enrollment, read the generated token:
+
+```sh
+docker compose exec cso cat /data/bootstrap.key
+```
+
+The published image is `ghcr.io/cosinecloud/cso:latest`, with **linux/arm64** (64-bit Raspberry Pi) and **linux/amd64** variants. Docker chooses the architecture automatically. Images are built by the repository's **Publish Docker image** GitHub Actions workflow. The first publication must finish successfully before `compose pull` works. If the GitHub package is private, authenticate with `docker login ghcr.io` using an account/token with package access, or make the package public in GitHub package settings.
+
+If the published image is unavailable, build directly on your Pi instead:
+
+```sh
+docker compose build --pull
+docker compose up -d --no-build
+```
+
+This builds the same Dockerfile for your Pi's native architecture. A 32-bit Raspberry Pi OS is not supported by this Docker configuration; use a 64-bit OS. Recommend Pi 4/5 with 4 GB or more RAM. Keep concurrent operations at 1 and start with the supplied 128 MiB file ceiling. Large-file encryption and compression still require substantial RAM inside Docker.
+
+### OuthMan connectivity
+
+`127.0.0.1` inside the CSO container refers to CSO's container, **not the Pi host**. Set `OUTHMAN_BASE_URL` to the actual reachable OuthMan URL, preferably HTTPS. For OuthMan running directly on the Pi, `host.docker.internal` resolves to the host through the supplied gateway mapping, but OuthMan must listen on an address reachable from Docker (a host-loopback-only listener is not reachable through that mapping). When OuthMan is another container, put both services on a shared Docker network and use its service hostname. Do not change a production OuthMan identity/origin casually: existing users are bound to it.
+
+### Storage, settings and updates
+
+- The `cso_data` named volume mounted at `/data` contains the database, encryption keys, operation history, staging files and local-provider files. Compose prefixes the volume name with its project name. Keep the same project/directory name when updating; changing it can create a separate empty volume.
+- Stop/restart with `docker compose stop` / `docker compose up -d`. Do **not** run `docker compose down -v` unless intentionally deleting all CSO data.
+- To update: wait for Running Operations to finish, back up data, then run `git pull --ff-only`, `docker compose pull`, and `docker compose up -d --no-build`. For local builds, use `docker compose build --pull` instead of `pull`.
+- For a consistent full backup, stop the container and back up the named volume plus `.env` securely; resume afterward. BackMan API snapshots are documented in [Backup_API.md](Backup_API.md).
+- Set `CSO_PORT` in `.env` to change the published host port. Keep container `PORT=10081`; the image healthcheck uses that internal port. Port 10080 is blocked by browsers.
+- This Compose file exposes port 10081 on host interfaces for private LAN use. For a host reverse proxy/SSH tunnel, set `CSO_BIND_ADDRESS=127.0.0.1`. Use HTTPS for remote access, set `CSO_PUBLIC_URL`, and enable `CSO_SECURE_COOKIES=1` only with HTTPS. Never directly publish unencrypted credentials/API keys across an untrusted network.
+- Keep one CSO container per data volume. Restarting interrupts active jobs; healthchecks report HTTP availability, not provider access. Use **Test drive** to check cloud connectivity.
+
+### Migrate this existing CSO installation
+
+Do not start a fresh volume if you intend to retain existing configuration. Wait for operations to finish and stop the old CSO process. Transfer its entire `data/` directory securely to the Pi. To import it, prepare Compose and `.env` above, then run from the project directory (replace `/absolute/path/to/data`):
+
+```sh
+docker compose create
+docker compose run --rm --no-deps --user 0:0 \
+  -v /absolute/path/to/data:/import:ro \
+  --entrypoint sh cso \
+  -c 'cp -a /import/. /data/ && chown -R 10001:10001 /data && chmod 700 /data'
+docker compose up -d --no-build
+```
+
+Import only into a new/empty destination volume; do not merge different live installations. Preserve any effective `CSO_ENCRYPTION_KEY` environment override in `.env`. Copying the existing master key and database together is essential. Retain the source backup until cloud access and representative downloads are verified. The import container exits after copying; the normal service runs as non-root UID/GID 10001.
+
+---
+
+# Manual deployment reference
+
+The following instructions are optional if using Docker.
+
 # Deploy CSO on Raspberry Pi / ARM
 
 ## Compatibility and sizing

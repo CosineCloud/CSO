@@ -1,0 +1,28 @@
+services:
+  cso:
+    image: ${CSO_IMAGE:-ghcr.io/cosinecloud/cso:latest}
+    build: .
+    restart: unless-stopped
+    init: true
+    env_file: .env
+    environment:
+      CSO_DATA_DIR: /data
+      CSO_HOST: 0.0.0.0
+      PORT: "10081"
+    ports:
+      - "${CSO_BIND_ADDRESS:-0.0.0.0}:${CSO_PORT:-10081}:10081"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - cso_data:/data
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+volumes:
+  cso_data:
